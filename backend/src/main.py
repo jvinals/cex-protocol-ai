@@ -1,5 +1,5 @@
-# backend/src/main.py - CORRECTED ENDPOINT VERSION
-# This version uses the correct ElevenLabs API endpoint: /v1/convai/agents/create
+# backend/src/main.py - CORRECTED BATCH CALLING ENDPOINT
+# This version uses the correct batch calling endpoint: /v1/convai/batch-calling/submit
 
 import os
 import sys
@@ -31,6 +31,9 @@ CORS(app, origins="*")
 # ElevenLabs configuration
 ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY', 'your-api-key-here')
 ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1"
+
+# Your ElevenLabs phone number ID
+ELEVENLABS_PHONE_NUMBER_ID = "phnum_8301k3dyf6s8etgtzp4c60pct5s9"
 
 # Store active calls (in production, use a database)
 active_calls = {}
@@ -82,29 +85,29 @@ class ElevenLabsClient:
                 "name": config.name
             }
             
-            # Use the CORRECT endpoint: /v1/convai/agents/create (not /v1/convai/agents)
+            # Use the CORRECT endpoint: /v1/convai/agents/create
             response = await client.post(
                 f"{ELEVENLABS_BASE_URL}/convai/agents/create",
                 headers=self.headers,
                 json=payload
             )
             
-            print(f"🔍 API Response Status: {response.status_code}")
-            print(f"🔍 API Response Body: {response.text}")
+            print(f"🔍 Agent Creation - Status: {response.status_code}")
+            if response.status_code != 200:
+                print(f"🔍 Agent Creation - Error: {response.text}")
             
             if response.status_code == 200:
                 return response.json()
             else:
                 raise Exception(f"Failed to create agent: {response.status_code} - {response.text}")
     
-    async def create_batch_call(self, phone_number: str, agent_id: str, 
-                               agent_phone_number_id: str = None) -> Dict[str, Any]:
-        """Create a batch call (single recipient) using the correct API endpoint"""
+    async def create_batch_call(self, phone_number: str, agent_id: str) -> Dict[str, Any]:
+        """Create a batch call using the CORRECT endpoint: /v1/convai/batch-calling/submit"""
         async with httpx.AsyncClient() as client:
             payload = {
-                "call_name": f"Single call to {phone_number}",
+                "call_name": f"AI Call to {phone_number}",
                 "agent_id": agent_id,
-                "agent_phone_number_id": agent_phone_number_id or "default",  # You need to configure this
+                "agent_phone_number_id": ELEVENLABS_PHONE_NUMBER_ID,  # Your phone number ID
                 "scheduled_time_unix": None,  # Send immediately
                 "recipients": [
                     {
@@ -113,11 +116,17 @@ class ElevenLabsClient:
                 ]
             }
             
+            print(f"🔍 Batch Call Payload: {json.dumps(payload, indent=2)}")
+            
+            # CORRECTED ENDPOINT: /v1/convai/batch-calling/submit (not /v1/convai/batch-calls)
             response = await client.post(
-                f"{ELEVENLABS_BASE_URL}/convai/batch-calls",
+                f"{ELEVENLABS_BASE_URL}/convai/batch-calling/submit",
                 headers=self.headers,
                 json=payload
             )
+            
+            print(f"🔍 Batch Call - Status: {response.status_code}")
+            print(f"🔍 Batch Call - Response: {response.text}")
             
             if response.status_code == 200:
                 return response.json()
@@ -125,10 +134,11 @@ class ElevenLabsClient:
                 raise Exception(f"Failed to create batch call: {response.status_code} - {response.text}")
     
     async def get_batch_calls(self) -> Dict[str, Any]:
-        """Get all batch calls"""
+        """Get all batch calls using the correct endpoint"""
         async with httpx.AsyncClient() as client:
+            # CORRECTED ENDPOINT: /v1/convai/batch-calling (not /v1/convai/batch-calls)
             response = await client.get(
-                f"{ELEVENLABS_BASE_URL}/convai/batch-calls",
+                f"{ELEVENLABS_BASE_URL}/convai/batch-calling",
                 headers=self.headers
             )
             
@@ -235,20 +245,38 @@ Start the conversation with a friendly greeting and introduction.""",
             loop.close()
             print(f"✅ Agent created: {agent_id}")
         
-        # Note: You need to configure a phone number in ElevenLabs dashboard first
-        print("⚠️  Phone number configuration required for actual calls")
+        # Now make the actual call using your phone number
+        print(f"📞 Initiating call to {phone_number} with agent {agent_id}")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        call_result = loop.run_until_complete(
+            elevenlabs_client.create_batch_call(phone_number, agent_id)
+        )
+        loop.close()
+        
+        batch_call_id = call_result.get("id")
+        
+        # Store call information
+        active_calls[batch_call_id] = {
+            "phone_number": phone_number,
+            "agent_id": agent_id,
+            "status": "initiated",
+            "start_time": datetime.now().isoformat(),
+            "purpose": data.get('callPurpose'),
+            "questions": data.get('questions', []),
+            "batch_call_data": call_result
+        }
+        
+        print(f"✅ Call initiated successfully: {batch_call_id}")
+        
         return jsonify({
-            'success': False,
-            'error': 'Phone number configuration required',
-            'message': 'To make phone calls, you need to configure a phone number in your ElevenLabs dashboard first. Please visit https://elevenlabs.io/app/conversational-ai and set up a phone number.',
+            'success': True,
+            'batch_call_id': batch_call_id,
             'agent_id': agent_id,
-            'next_steps': [
-                '1. Go to https://elevenlabs.io/app/conversational-ai',
-                '2. Set up a phone number (Twilio integration or SIP trunking)',
-                '3. Note the phone number ID',
-                '4. Update the backend with your phone number ID'
-            ]
-        }), 400
+            'status': 'initiated',
+            'message': 'Call initiated successfully! The AI will call the number shortly.',
+            'call_details': call_result
+        })
         
     except Exception as e:
         print(f"❌ Error making call: {e}")
@@ -289,12 +317,14 @@ This is just a test to verify agent creation works correctly.""",
         return jsonify({
             'success': True,
             'agent_id': agent_result.get("agent_id"),
-            'message': 'Test agent created successfully! You can now configure phone numbers in ElevenLabs dashboard.',
+            'message': 'Test agent created successfully! Phone number is configured and ready for calls.',
             'agent_config': {
                 'name': agent_config.name,
                 'voice_id': agent_config.voice_id,
                 'language': agent_config.language
-            }
+            },
+            'phone_number_configured': True,
+            'phone_number_id': ELEVENLABS_PHONE_NUMBER_ID
         })
         
     except Exception as e:
@@ -327,15 +357,57 @@ def get_batch_calls():
             "error": str(e)
         }), 500
 
+@app.route('/api/call-status/<batch_call_id>', methods=['GET'])
+def get_call_status(batch_call_id):
+    """Get the status of a specific batch call"""
+    try:
+        if batch_call_id in active_calls:
+            local_info = active_calls[batch_call_id]
+            
+            # Get latest status from ElevenLabs
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                batch_calls = loop.run_until_complete(elevenlabs_client.get_batch_calls())
+                loop.close()
+                
+                # Find our specific batch call
+                for batch_call in batch_calls.get("batch_calls", []):
+                    if batch_call.get("id") == batch_call_id:
+                        local_info.update(batch_call)
+                        break
+                        
+            except Exception as e:
+                print(f"⚠️  Could not get remote status: {e}")
+            
+            return jsonify({
+                "success": True,
+                "batch_call_id": batch_call_id,
+                "status": local_info.get("status", "unknown"),
+                "call_info": local_info
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": "Call not found"
+            }), 404
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 @app.route('/api/webhook', methods=['POST'])
 def webhook_handler():
     """Handle webhooks from ElevenLabs"""
     try:
         webhook_data = request.get_json()
         print(f"🔔 Webhook received: {webhook_data.get('type', 'unknown')}")
+        print(f"🔔 Webhook data: {json.dumps(webhook_data, indent=2)}")
         
         # Store webhook data for debugging
-        webhook_id = webhook_data.get("id", "unknown")
+        webhook_id = webhook_data.get("id", f"webhook_{datetime.now().isoformat()}")
         active_calls[webhook_id] = webhook_data
         
         return jsonify({"status": "success"})
@@ -352,6 +424,14 @@ def get_webhooks():
         "webhooks": active_calls
     })
 
+@app.route('/api/active-calls', methods=['GET'])
+def get_active_calls():
+    """Get all active calls"""
+    return jsonify({
+        "success": True,
+        "active_calls": active_calls
+    })
+
 # Custom 404 handler to suppress Socket.IO errors
 @app.errorhandler(404)
 def not_found(error):
@@ -364,11 +444,7 @@ def not_found(error):
 if __name__ == '__main__':
     print("🚀 Starting CEX Protocol AI Backend on http://0.0.0.0:5001")
     print("🔑 ElevenLabs API Key configured:", "Yes" if ELEVENLABS_API_KEY != 'your-api-key-here' else "No - Please set ELEVENLABS_API_KEY")
-    print("\n📋 IMPORTANT: To make phone calls, you need to:")
-    print("   1. Set up a phone number in ElevenLabs dashboard")
-    print("   2. Visit: https://elevenlabs.io/app/conversational-ai")
-    print("   3. Configure Twilio integration or SIP trunking")
-    print("   4. Update the backend with your phone number ID")
-    print("\n✨ Server ready! Logs will show important events only.\n")
+    print(f"📞 Phone Number ID configured: {ELEVENLABS_PHONE_NUMBER_ID}")
+    print("\n✨ Server ready! You can now make actual phone calls!\n")
     
     app.run(host='0.0.0.0', port=5001, debug=True)
