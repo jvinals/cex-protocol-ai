@@ -1,9 +1,10 @@
-# backend/src/main.py - CORRECTED BATCH CALLING ENDPOINT
-# This version uses the correct batch calling endpoint: /v1/convai/batch-calling/submit
+# backend/src/main.py - FIXED SCHEDULED_TIME_UNIX FIELD
+# This version provides a proper timestamp for scheduled_time_unix
 
 import os
 import sys
 import logging
+import time
 
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -102,13 +103,16 @@ class ElevenLabsClient:
                 raise Exception(f"Failed to create agent: {response.status_code} - {response.text}")
     
     async def create_batch_call(self, phone_number: str, agent_id: str) -> Dict[str, Any]:
-        """Create a batch call using the CORRECT endpoint: /v1/convai/batch-calling/submit"""
+        """Create a batch call using the CORRECT endpoint with proper timestamp"""
         async with httpx.AsyncClient() as client:
+            # Get current Unix timestamp for immediate execution
+            current_time = int(time.time())
+            
             payload = {
                 "call_name": f"AI Call to {phone_number}",
                 "agent_id": agent_id,
                 "agent_phone_number_id": ELEVENLABS_PHONE_NUMBER_ID,  # Your phone number ID
-                "scheduled_time_unix": None,  # Send immediately
+                "scheduled_time_unix": current_time,  # Use current timestamp for immediate execution
                 "recipients": [
                     {
                         "phone_number": phone_number
@@ -118,7 +122,7 @@ class ElevenLabsClient:
             
             print(f"🔍 Batch Call Payload: {json.dumps(payload, indent=2)}")
             
-            # CORRECTED ENDPOINT: /v1/convai/batch-calling/submit (not /v1/convai/batch-calls)
+            # CORRECTED ENDPOINT: /v1/convai/batch-calling/submit
             response = await client.post(
                 f"{ELEVENLABS_BASE_URL}/convai/batch-calling/submit",
                 headers=self.headers,
@@ -136,7 +140,7 @@ class ElevenLabsClient:
     async def get_batch_calls(self) -> Dict[str, Any]:
         """Get all batch calls using the correct endpoint"""
         async with httpx.AsyncClient() as client:
-            # CORRECTED ENDPOINT: /v1/convai/batch-calling (not /v1/convai/batch-calls)
+            # CORRECTED ENDPOINT: /v1/convai/batch-calling
             response = await client.get(
                 f"{ELEVENLABS_BASE_URL}/convai/batch-calling",
                 headers=self.headers
