@@ -11,7 +11,7 @@ import { Phone, PhoneCall, Loader2, TestTube, CheckCircle } from 'lucide-react'
 import './App.css'
 
 function App() {
-  const [phoneNumber, setPhoneNumber] = useState('+13469943286')
+  const [phoneNumber, setPhoneNumber] = useState('+34699043286')
   const [agentId, setAgentId] = useState('create_new')
   const [callPurpose, setCallPurpose] = useState('Customer Survey')
   const [questions, setQuestions] = useState('What is your name?\nWhat is your email address?\nHow satisfied are you with our service?')
