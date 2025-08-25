@@ -18,7 +18,7 @@ function App() {
       'Have you noticed any new or different symptoms since we last spoke?',
       'Is there anything else you\'d like Dr. Vinals to know about how you\'ve been feeling?'
     ],
-    voiceId: '21m00Tcm4TlvDq8ikWAM', // Default voice
+    voiceId: 'EXAVITQu4vr4xnSDxMaL', // Default voice
     language: 'en',
     firstMessage: 'Hi, I\'m the AI assistant of Dr. Vinals. I\'m calling to follow up on you and to ask if there are any concerns.',
     customPrompt: 'You are a professional AI assistant calling on behalf of Dr. Vinals. Be polite, professional, and empathetic. Start with the greeting (firstMessage), and don\'t wait for the patient to answer if he doesn\'t, just continue with the first question. If the patient has problems please help him. At the end you shpuld return a JSON object with the results of the call in an strctured way.'
@@ -37,9 +37,9 @@ function App() {
 
   // Available voices (you can expand this list)
   const availableVoices = [
-    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel (Default)' },
+    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel' },
     { id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi' },
-    { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella' },
+    { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella (Default)' },
     { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni' },
     { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli' },
     { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh' },

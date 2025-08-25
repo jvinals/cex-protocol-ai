@@ -347,7 +347,7 @@ def get_agent_templates():
                 "Have you noticed any new or different symptoms since we last spoke?",
                 "Is there anything else you'd like Dr. Vinals to know about how you've been feeling?"
             ],
-            "voice_id": "21m00Tcm4TlvDq8ikWAM",
+            "voice_id": "EXAVITQu4vr4xnSDxMaL",
             "language": "en",
             "first_message": "Hi, I'm the AI assistant of Dr. Vinals. I'm calling to follow up on your hypertension treatment and see how you're doing. I have a few questions about your medication and symptoms. Is this a good time to talk?",
             "custom_prompt": "You are a professional AI assistant calling on behalf of Dr. Vinals for a hypertension follow-up. Ask each question individually and wait for responses. Be understanding about medical concerns and encourage patients to be honest about their symptoms and medication compliance."
