@@ -241,6 +241,8 @@ class ElevenLabsClient:
 # Initialize ElevenLabs client
 elevenlabs_client = ElevenLabsClient(ELEVENLABS_API_KEY)
 
+# 1. Start: Use your first message to greet the person and don't wait for an answer and move to the questions, just continue immediately without a pause
+
 def build_structured_prompt(agent_config: dict) -> str:
     """Build an optimized prompt that works better with ElevenLabs conversational AI"""
     
@@ -258,7 +260,7 @@ def build_structured_prompt(agent_config: dict) -> str:
 
 CONVERSATION SCRIPT - Follow this exact sequence:
 
-1. Start: Use your first message to greet the person and don't wait for an answer and move to the questions
+1. Start Say hello
 2. Then ask these questions ONE AT A TIME, waiting for each answer:
 
 """
