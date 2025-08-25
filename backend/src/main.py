@@ -258,7 +258,7 @@ def build_structured_prompt(agent_config: dict) -> str:
 
 CONVERSATION SCRIPT - Follow this exact sequence:
 
-1. Start: Use your first message to greet the person
+1. Start: Use your first message to greet the person and don't wait for an answer and move to the questions
 2. Then ask these questions ONE AT A TIME, waiting for each answer:
 
 """
