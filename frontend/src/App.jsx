@@ -17,20 +17,21 @@ function App() {
     voiceId: '21m00Tcm4TlvDq8ikWAM', // Default voice
     language: 'en',
     firstMessage: '',
-    customPrompt: ''
+    customPrompt: 'You are a professional AI assistant calling on behalf of Dr. Vinals. Be polite, professional, and helpful. Ask the questions clearly and listen carefully to the responses.'
   })
   const [callStatus, setCallStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [lastCallId, setLastCallId] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [callResults, setCallResults] = useState(null)
 
   // Available voices (you can expand this list)
   const availableVoices = [
-    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel (Default)' },
+    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel' },
     { id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi' },
     { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella' },
     { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni' },
-    { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli' },
+    { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli (Default)' },
     { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh' },
     { id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold' },
     { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam' }
@@ -38,50 +39,54 @@ function App() {
 
   // Agent templates
   const agentTemplates = {
-    'customer_survey': {
-      name: 'Customer Survey Agent',
-      purpose: 'Customer satisfaction survey',
+    'standard_protocol': {
+      name: 'Standard Basic Protocol',
+      purpose: 'General follow-up',
       questions: [
-        'What is your name?',
-        'What is your email address?',
-        'How satisfied are you with our service on a scale of 1-10?',
-        'What could we improve?'
+        'Ive noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, where 1 means you feel much worse and 10 means you feel much better, how would you rate how you’ve been feeling with your blood pressure this past week?',
+        'Are you keeping up with Lisinopril as instructed?',
+        'Are you keeping up with Amlodipine as instructed?',
+        'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
+        'Have you noticed any new or different symptoms since we last spoke?',
+        'Is there anything else you\’d like Dr. Vinals to know about how you\’ve been feeling?',
       ],
-      firstMessage: 'Hello! I\'m calling to conduct a brief customer satisfaction survey. Do you have 3-4 minutes to help us improve our service?'
+      firstMessage: 'Hi, I\’m the AI assistant of Dr. Vinals. I\’m calling to follow up on you and to ask if there\’s anything you\’d like the doctor to know.'
     },
-    'appointment_booking': {
-      name: 'Appointment Booking Agent',
-      purpose: 'Schedule appointments',
+    'hypertension_protocol': {
+      name: 'Hypertension Protocol',
+      purpose: 'Follow up on hypertension patients',
+      questions: [
+        'Ive noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, where 1 means you feel much worse and 10 means you feel much better, how would you rate how you’ve been feeling with your blood pressure this past week?',
+        'Are you keeping up with Lisinopril as instructed?',
+        'Are you keeping up with Amlodipine as instructed?',
+        'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
+        'Have you noticed any new or different symptoms since we last spoke?',
+        'Is there anything else you\’d like Dr. Vinals to know about how you\’ve been feeling?',
+      ],
+      firstMessage: 'Hi, I\’m the AI assistant of Dr. Vinals. I\’m calling to follow up on you and to ask if there\’s anything you\’d like the doctor to know.'
+    },
+    'diabetes_protocol': {
+      name: 'Diabetes Protocol',
+      purpose: 'Follow up on diabetes patients',
       questions: [
         'What is your preferred date for the appointment?',
         'What time works best for you?',
         'What is your contact information?',
         'Do you have any special requirements?'
       ],
-      firstMessage: 'Hello! I\'m calling to help you schedule an appointment. When would be a convenient time for you?'
+      firstMessage: 'Hi, I\’m the AI assistant of Dr. Vinals. I\’m calling to follow up on you and to ask if there\’s anything you\’d like the doctor to know.'
     },
-    'lead_qualification': {
-      name: 'Lead Qualification Agent',
-      purpose: 'Qualify potential leads',
+    'asthma_protocol': {
+      name: 'Asthma Protocol',
+      purpose: 'Follow up on asthmatic patients',
       questions: [
         'What is your company name and role?',
         'What is your current budget range?',
         'When are you looking to make a decision?',
         'What are your main pain points?'
       ],
-      firstMessage: 'Hello! I\'m calling to learn more about your business needs and see how we might be able to help.'
-    },
-    'feedback_collection': {
-      name: 'Feedback Collection Agent',
-      purpose: 'Collect product feedback',
-      questions: [
-        'How long have you been using our product?',
-        'What features do you use most?',
-        'What challenges have you encountered?',
-        'What new features would you like to see?'
-      ],
-      firstMessage: 'Hello! I\'m calling to get your valuable feedback on our product. Your insights help us improve!'
-    }
+      firstMessage: 'Hi, I\’m the AI assistant of Dr. Vinals. I\’m calling to follow up on you and to ask if there\’s anything you\’d like the doctor to know.'
+    }   
   }
 
   const testBackend = async () => {
@@ -102,6 +107,22 @@ function App() {
     }
     
     setIsLoading(false)
+  }
+
+  const fetchCallResults = async (callId) => {
+    try {
+      const response = await fetch(`http://localhost:5001/api/call-results/${callId}`)
+      const data = await response.json()
+      
+      if (response.ok) {
+        setCallResults(data)
+        console.log('Call results:', data)
+      } else {
+        console.error('Failed to fetch call results:', data.error)
+      }
+    } catch (error) {
+      console.error('Error fetching call results:', error)
+    }
   }
 
   const testAgentCreation = async () => {
@@ -168,8 +189,8 @@ function App() {
       console.log('Call response:', data)
       
       if (data.success) {
-        setCallStatus(`✅ Call initiated successfully! Batch Call ID: ${data.batch_call_id}`)
-        setLastCallId(data.batch_call_id)
+        setCallStatus(`✅ Call initiated successfully! Call ID: ${data.call_id}`)
+        setLastCallId(data.call_id)
       } else {
         setCallStatus(`❌ Call failed: ${data.error}`)
       }
@@ -421,6 +442,47 @@ function App() {
             )}
           </div>
         </section>
+
+        {/* Call Results Section */}
+        {lastCallId && (
+          <section className="results-section">
+            <h2>📊 Call Results</h2>
+            <div className="results-content">
+              <p><strong>Call ID:</strong> {lastCallId}</p>
+              <button 
+                onClick={() => fetchCallResults(lastCallId)}
+                className="fetch-results-btn"
+              >
+                🔄 Fetch Results
+              </button>
+              
+              {callResults && (
+                <div className="results-data">
+                  <h3>Call Summary</h3>
+                  <p><strong>Status:</strong> {callResults.status}</p>
+                  <p><strong>Duration:</strong> {Math.round(callResults.duration)} seconds</p>
+                  <p><strong>Total Responses:</strong> {callResults.total_responses}</p>
+                  <p><strong>Average Confidence:</strong> {(callResults.summary.average_confidence * 100).toFixed(1)}%</p>
+                  
+                  <h3>Responses</h3>
+                  <div className="responses-list">
+                    {callResults.responses.map((response, index) => (
+                      <div key={index} className="response-item">
+                        <p><strong>Response {index + 1}:</strong> {response.answer}</p>
+                        <p><em>Confidence: {(response.confidence * 100).toFixed(1)}%</em></p>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <h3>Raw JSON</h3>
+                  <pre className="json-display">
+                    {JSON.stringify(callResults, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   )

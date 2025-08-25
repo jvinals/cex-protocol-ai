@@ -127,6 +127,9 @@ def make_call():
             'message': 'Failed to initiate call'
         }), 500
 
+# Store conversation data (in production, use a database)
+conversation_store = {}
+
 @phone_calls_bp.route('/handle-response', methods=['POST'])
 def handle_response():
     """Handle user responses during the call"""
@@ -137,6 +140,21 @@ def handle_response():
         call_sid = request.form.get('CallSid', '')
         
         print(f"User said: {speech_result} (confidence: {confidence})")
+        
+        # Store the conversation
+        if call_sid not in conversation_store:
+            conversation_store[call_sid] = {
+                'responses': [],
+                'questions': [],
+                'start_time': time.time()
+            }
+        
+        conversation_store[call_sid]['responses'].append({
+            'question': 'User response',
+            'answer': speech_result,
+            'confidence': confidence,
+            'timestamp': time.time()
+        })
         
         # Here you would integrate with an AI service to generate a response
         # For now, we'll create a simple response
@@ -157,6 +175,35 @@ def handle_response():
     except Exception as e:
         print(f"Error handling response: {e}")
         return "Error", 500
+
+@phone_calls_bp.route('/call-results/<call_id>', methods=['GET'])
+def get_call_results(call_id):
+    """Get the results of a specific call"""
+    try:
+        if call_id in conversation_store:
+            conversation = conversation_store[call_id]
+            
+            # Process the conversation into structured data
+            results = {
+                'call_id': call_id,
+                'status': 'completed',
+                'duration': time.time() - conversation['start_time'],
+                'total_responses': len(conversation['responses']),
+                'responses': conversation['responses'],
+                'summary': {
+                    'questions_asked': len(conversation['questions']),
+                    'responses_received': len(conversation['responses']),
+                    'average_confidence': sum(float(r['confidence']) for r in conversation['responses']) / len(conversation['responses']) if conversation['responses'] else 0
+                }
+            }
+            
+            return jsonify(results)
+        else:
+            return jsonify({'error': 'Call not found'}), 404
+            
+    except Exception as e:
+        print(f"Error retrieving call results: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @phone_calls_bp.route('/webhook', methods=['POST'])
 def webhook_handler():
