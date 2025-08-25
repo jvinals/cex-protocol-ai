@@ -1,10 +1,12 @@
-// frontend/src/App.jsx - FIXED VERSION WITH BETTER CONVERSATION PROCESSING
-// This version handles conversation results better and provides manual processing option
+// frontend/src/App.jsx - UPDATED VERSION BASED ON CURRENT REPOSITORY
+// This version builds on your existing code and adds call tracking and conversation results functionality
+// Handles conversation results better and provides manual processing option
 
 import { useState, useEffect } from 'react'
 import './App.css'
 
 function App() {
+  // Existing state from your current repository
   const [phoneNumber, setPhoneNumber] = useState('+34699043286')
   const [agentConfig, setAgentConfig] = useState({
     name: 'Standard Basic Protocol',
@@ -12,7 +14,6 @@ function App() {
     questions: [
       'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, how are you feeling today?',
       'Are you keeping up with Lisinopril as instructed?',
-      'What about Losartan?',
       'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
       'Have you noticed any new or different symptoms since we last spoke?',
       'Is there anything else you\'d like Dr. Vinals to know about how you\'ve been feeling?'
@@ -20,8 +21,10 @@ function App() {
     voiceId: '21m00Tcm4TlvDq8ikWAM', // Default voice
     language: 'en',
     firstMessage: 'Hi, I\'m the AI assistant of Dr. Vinals. I\'m calling to follow up on you and to ask if there are any concerns.',
-    customPrompt: 'You are a professional AI assistant calling on behalf of Dr. Vinals. Be polite, professional, and helpful. Ask the questions clearly and listen carefully to the responses.'
+    customPrompt: 'You are a professional AI assistant calling on behalf of Dr. Vinals. Be polite, professional, and empathetic. Start with the greeting (firstMessage), and don\'t wait for the patient to answer if he doesn\'t, just continue with the first question. If the patient has problems please help him. At the end you shpuld return a JSON object with the results of the call in an strctured way.'
   })
+  
+  // New state for call tracking and results
   const [callStatus, setCallStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [currentCall, setCurrentCall] = useState(null)
@@ -29,6 +32,8 @@ function App() {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [activeCalls, setActiveCalls] = useState({})
   const [pollingInterval, setPollingInterval] = useState(null)
+  const [debugInfo, setDebugInfo] = useState(null)
+  const [showDebug, setShowDebug] = useState(false)
 
   // Available voices (you can expand this list)
   const availableVoices = [
@@ -36,7 +41,7 @@ function App() {
     { id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi' },
     { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella' },
     { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni' },
-    { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli (Default)' },
+    { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli' },
     { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh' },
     { id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold' },
     { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam' }
@@ -48,7 +53,7 @@ function App() {
       name: 'Standard Basic Protocol',
       purpose: 'General follow-up',
       questions: [
-        'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, where 1 means you are not satisfied with Lisinopril as instructed?',
+        'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, how are you feeling today?',
         'Are you keeping up with Lisinopril as instructed?',
         'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
         'Have you noticed any new or different symptoms since we last spoke?',
@@ -62,7 +67,6 @@ function App() {
       questions: [
         'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, how are you feeling today?',
         'Are you keeping up with Lisinopril as instructed?',
-        'What about Losartan?',
         'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
         'Have you noticed any new or different symptoms since we last spoke?',
         'Is there anything else you\'d like Dr. Vinals to know about how you\'ve been feeling?'
@@ -73,7 +77,7 @@ function App() {
       name: 'Diabetes Protocol',
       purpose: 'Follow up on diabetes patients',
       questions: [
-        'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, where 1 means you are not satisfied with Losartan as instructed?',
+        'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, how are you feeling with Losartan as instructed?',
         'Are you keeping up with Losartan as instructed?',
         'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
         'Have you noticed any new or different symptoms since we last spoke?',
@@ -113,7 +117,7 @@ function App() {
               call_info: data.call_info
             }))
             
-            // If call is completed and has results, show them
+            // If call is completed, show message but don't auto-process
             if (status === 'completed') {
               if (data.call_info.conversation_results) {
                 setCallResults(data.call_info.conversation_results)
@@ -121,7 +125,7 @@ function App() {
                 clearInterval(interval)
                 setPollingInterval(null)
               } else {
-                setCallStatus('✅ Call completed! Processing conversation... Click "Get Results" if they don\'t appear automatically.')
+                setCallStatus('✅ Call completed! Click "Get Results" to fetch the conversation.')
               }
             } else if (status === 'failed' || status === 'cancelled') {
               setCallStatus(`❌ Call ${status}`)
@@ -225,6 +229,7 @@ function App() {
     setIsLoading(true)
     setCallStatus('Initiating call...')
     setCallResults(null) // Clear previous results
+    setDebugInfo(null) // Clear debug info
     
     // Clear any existing polling
     if (pollingInterval) {
@@ -292,11 +297,37 @@ function App() {
       if (data.success) {
         setCallResults(data.results)
         setCallStatus('✅ Conversation results retrieved!')
+        setDebugInfo(null) // Clear debug info on success
       } else {
         setCallStatus(`❌ Could not get results: ${data.message}`)
+        if (data.debug_info) {
+          setDebugInfo(data.debug_info)
+        }
       }
     } catch (error) {
       setCallStatus('❌ Error fetching results')
+    }
+    
+    setIsLoading(false)
+  }
+
+  const debugConversations = async () => {
+    setIsLoading(true)
+    setCallStatus('Fetching all conversations for debugging...')
+    
+    try {
+      const response = await fetch('http://localhost:5001/api/debug-conversations')
+      const data = await response.json()
+      
+      if (data.success) {
+        setDebugInfo(data.conversations)
+        setCallStatus('✅ Debug information retrieved! Check the debug section below.')
+        setShowDebug(true)
+      } else {
+        setCallStatus(`❌ Could not get debug info: ${data.error}`)
+      }
+    } catch (error) {
+      setCallStatus('❌ Error fetching debug info')
     }
     
     setIsLoading(false)
@@ -360,14 +391,14 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>CEX Protocol AI</h1>
-        <p>Testbed and Configuration of the Protocol AI agent</p>
+        <h1>🤖 CEX Protocol AI Phone System</h1>
+        <p>Configure your AI agent and make intelligent phone calls</p>
       </header>
 
       <main className="main-content">
         {/* Agent Configuration Section */}
         <section className="config-section">
-          <h2>Agent Configuration</h2>
+          <h2>🎯 Agent Configuration</h2>
           
           {/* Quick Templates */}
           <div className="templates">
@@ -497,7 +528,7 @@ function App() {
 
         {/* Phone Call Section */}
         <section className="call-section">
-          <h2>Make Phone Call</h2>
+          <h2>📞 Make Phone Call</h2>
           
           <div className="phone-input">
             <label>
@@ -546,24 +577,31 @@ function App() {
           {/* Current Call Tracking */}
           {currentCall && (
             <div className="current-call">
-              <h3>Current Call</h3>
+              <h3>📞 Current Call</h3>
               <div className="call-info">
                 <p><strong>Phone:</strong> {currentCall.phone_number}</p>
                 <p><strong>Status:</strong> {formatCallStatus(currentCall.status)}</p>
                 <p><strong>Call ID:</strong> {currentCall.batch_call_id}</p>
+                <p><strong>Agent ID:</strong> {currentCall.agent_id}</p>
                 <p><strong>Started:</strong> {new Date(currentCall.start_time).toLocaleString()}</p>
               </div>
               
               <div className="call-actions">
-                {currentCall.status === 'completed' && !callResults && (
-                  <button 
-                    onClick={getCallResults}
-                    disabled={isLoading}
-                    className="results-btn"
-                  >
-                    {isLoading ? '⏳ Getting Results...' : '📋 Get Results'}
-                  </button>
-                )}
+                <button 
+                  onClick={getCallResults}
+                  disabled={isLoading}
+                  className="results-btn"
+                >
+                  {isLoading ? '⏳ Getting Results...' : '📋 Get Results'}
+                </button>
+                
+                <button 
+                  onClick={debugConversations}
+                  disabled={isLoading}
+                  className="debug-btn"
+                >
+                  {isLoading ? '⏳ Debugging...' : '🔍 Debug Conversations'}
+                </button>
                 
                 {pollingInterval && (
                   <button 
@@ -578,14 +616,43 @@ function App() {
           )}
         </section>
 
+        {/* Debug Information Section */}
+        {debugInfo && (
+          <section className="debug-section">
+            <h2>🔍 Debug Information</h2>
+            <button 
+              onClick={() => setShowDebug(!showDebug)}
+              className="toggle-btn"
+            >
+              {showDebug ? '🔼' : '🔽'} {showDebug ? 'Hide' : 'Show'} Debug Details
+            </button>
+            
+            {showDebug && (
+              <div className="debug-content">
+                <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+              </div>
+            )}
+            
+            {debugInfo.batch_call_id && (
+              <div className="debug-summary">
+                <h3>Debug Summary:</h3>
+                <p><strong>Looking for Batch Call ID:</strong> {debugInfo.batch_call_id}</p>
+                <p><strong>Agent ID:</strong> {debugInfo.agent_id}</p>
+                <p><strong>Total Conversations Found:</strong> {debugInfo.total_conversations}</p>
+                <p><strong>Fetch Attempts:</strong> {debugInfo.attempts}/5</p>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Call Results Section */}
         {callResults && (
           <section className="results-section">
-            <h2>Conversation Results</h2>
+            <h2>📋 Conversation Results</h2>
             
             <div className="results-content">
               <div className="extracted-info">
-                <h3>Extracted Information</h3>
+                <h3>📊 Extracted Information</h3>
                 {Object.entries(callResults.extracted_info).map(([key, info]) => (
                   <div key={key} className="info-item">
                     <strong>Q: {info.question}</strong>
@@ -595,16 +662,19 @@ function App() {
               </div>
               
               <div className="transcript">
-                <h3>Full Transcript</h3>
+                <h3>📝 Full Transcript</h3>
                 <div className="transcript-content">
                   {callResults.transcript || 'No transcript available'}
                 </div>
               </div>
               
               <div className="metadata">
-                <h3>ℹCall Metadata</h3>
+                <h3>ℹ️ Call Metadata</h3>
                 <p><strong>Conversation ID:</strong> {callResults.conversation_id}</p>
                 <p><strong>Processed At:</strong> {new Date(callResults.processed_at).toLocaleString()}</p>
+                {callResults.note && (
+                  <p><strong>Note:</strong> {callResults.note}</p>
+                )}
               </div>
             </div>
           </section>
@@ -625,6 +695,7 @@ function App() {
                     <p>Agent: {callInfo.agent_name || 'Unknown'}</p>
                     <p>Purpose: {callInfo.purpose || 'Unknown'}</p>
                     <p>Started: {callInfo.start_time ? new Date(callInfo.start_time).toLocaleString() : 'Unknown'}</p>
+                    <p>Call ID: {callId}</p>
                   </div>
                 </div>
               ))}
@@ -634,7 +705,7 @@ function App() {
 
         {/* Configuration Preview */}
         <section className="preview-section">
-          <h2>Agent Preview</h2>
+          <h2>👀 Agent Preview</h2>
           <div className="preview-content">
             <p><strong>Name:</strong> {agentConfig.name}</p>
             <p><strong>Purpose:</strong> {agentConfig.purpose}</p>
