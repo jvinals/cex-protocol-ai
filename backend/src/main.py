@@ -260,8 +260,7 @@ def build_structured_prompt(agent_config: dict) -> str:
 
 CONVERSATION SCRIPT - Follow this exact sequence:
 
-1. Start Say hello
-2. Then ask these questions ONE AT A TIME, waiting for each answer:
+1. Then ask these questions ONE AT A TIME, waiting for each answer:
 
 """
         
@@ -270,7 +269,8 @@ CONVERSATION SCRIPT - Follow this exact sequence:
             structured_prompt += f"   {i}. {question}\n"
         
         structured_prompt += f"""
-3. After all questions: Thank them and end the call
+2. After all questions: Thank them and end the call
+3. Create a JSON object with the results of the call in an structured way.
 
 IMPORTANT RULES:
 - Ask only ONE question at a time

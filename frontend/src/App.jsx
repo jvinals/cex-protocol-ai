@@ -67,6 +67,7 @@ function App() {
       questions: [
         'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, how are you feeling today?',
         'Are you keeping up with Lisinopril as instructed?',
+        'What about Losartan?',
         'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
         'Have you noticed any new or different symptoms since we last spoke?',
         'Is there anything else you\'d like Dr. Vinals to know about how you\'ve been feeling?'
