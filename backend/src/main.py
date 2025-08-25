@@ -1,16 +1,17 @@
-# backend/src/main.py - FIXED SCHEDULED_TIME_UNIX FIELD
-# This version provides a proper timestamp for scheduled_time_unix
+# backend/src/main.py - FIXED VERSION WITHOUT INFINITE LOOPS
+# This version prevents endless loops and handles conversation fetching properly
 
 import os
 import sys
 import logging
 import time
+import re
+import json
 
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import asyncio
-import json
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
@@ -36,8 +37,11 @@ ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1"
 # Your ElevenLabs phone number ID
 ELEVENLABS_PHONE_NUMBER_ID = "phnum_8301k3dyf6s8etgtzp4c60pct5s9"
 
-# Store active calls (in production, use a database)
+# Store active calls and results (in production, use a database)
 active_calls = {}
+call_results = {}
+conversation_data = {}
+processed_calls = set()  # Track which calls we've already processed to avoid loops
 
 # Pydantic models for request/response
 class CallRequest(BaseModel):
@@ -64,9 +68,8 @@ class ElevenLabsClient:
         }
     
     async def create_agent(self, config: AgentConfig) -> Dict[str, Any]:
-        """Create a conversational AI agent using the CORRECT API endpoint"""
+        """Create a conversational AI agent"""
         async with httpx.AsyncClient() as client:
-            # This is the correct payload structure based on ElevenLabs documentation
             payload = {
                 "conversation_config": {
                     "agent": {
@@ -86,7 +89,6 @@ class ElevenLabsClient:
                 "name": config.name
             }
             
-            # Use the CORRECT endpoint: /v1/convai/agents/create
             response = await client.post(
                 f"{ELEVENLABS_BASE_URL}/convai/agents/create",
                 headers=self.headers,
@@ -103,16 +105,15 @@ class ElevenLabsClient:
                 raise Exception(f"Failed to create agent: {response.status_code} - {response.text}")
     
     async def create_batch_call(self, phone_number: str, agent_id: str) -> Dict[str, Any]:
-        """Create a batch call using the CORRECT endpoint with proper timestamp"""
+        """Create a batch call"""
         async with httpx.AsyncClient() as client:
-            # Get current Unix timestamp for immediate execution
             current_time = int(time.time())
             
             payload = {
                 "call_name": f"AI Call to {phone_number}",
                 "agent_id": agent_id,
-                "agent_phone_number_id": ELEVENLABS_PHONE_NUMBER_ID,  # Your phone number ID
-                "scheduled_time_unix": current_time,  # Use current timestamp for immediate execution
+                "agent_phone_number_id": ELEVENLABS_PHONE_NUMBER_ID,
+                "scheduled_time_unix": current_time,
                 "recipients": [
                     {
                         "phone_number": phone_number
@@ -122,7 +123,6 @@ class ElevenLabsClient:
             
             print(f"🔍 Batch Call Payload: {json.dumps(payload, indent=2)}")
             
-            # CORRECTED ENDPOINT: /v1/convai/batch-calling/submit
             response = await client.post(
                 f"{ELEVENLABS_BASE_URL}/convai/batch-calling/submit",
                 headers=self.headers,
@@ -138,9 +138,8 @@ class ElevenLabsClient:
                 raise Exception(f"Failed to create batch call: {response.status_code} - {response.text}")
     
     async def get_batch_calls(self) -> Dict[str, Any]:
-        """Get all batch calls using the correct endpoint"""
+        """Get all batch calls"""
         async with httpx.AsyncClient() as client:
-            # CORRECTED ENDPOINT: /v1/convai/batch-calling
             response = await client.get(
                 f"{ELEVENLABS_BASE_URL}/convai/batch-calling",
                 headers=self.headers
@@ -150,9 +149,126 @@ class ElevenLabsClient:
                 return response.json()
             else:
                 raise Exception(f"Failed to get batch calls: {response.status_code} - {response.text}")
+    
+    async def get_batch_call_details(self, batch_call_id: str) -> Dict[str, Any]:
+        """Get detailed information about a specific batch call"""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{ELEVENLABS_BASE_URL}/convai/batch-calling/{batch_call_id}",
+                headers=self.headers
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                raise Exception(f"Failed to get batch call details: {response.status_code} - {response.text}")
+    
+    async def get_conversations(self) -> Dict[str, Any]:
+        """Get all conversations"""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{ELEVENLABS_BASE_URL}/convai/conversations",
+                headers=self.headers
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                raise Exception(f"Failed to get conversations: {response.status_code} - {response.text}")
+    
+    async def get_conversation_details(self, conversation_id: str) -> Dict[str, Any]:
+        """Get detailed conversation transcript"""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{ELEVENLABS_BASE_URL}/convai/conversations/{conversation_id}",
+                headers=self.headers
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                raise Exception(f"Failed to get conversation details: {response.status_code} - {response.text}")
 
 # Initialize ElevenLabs client
 elevenlabs_client = ElevenLabsClient(ELEVENLABS_API_KEY)
+
+def extract_information_from_transcript(transcript: str, questions: List[str]) -> Dict[str, Any]:
+    """Extract structured information from conversation transcript"""
+    extracted_info = {}
+    
+    # Simple extraction logic - you can enhance this with AI/NLP
+    transcript_lower = transcript.lower()
+    
+    for i, question in enumerate(questions):
+        question_key = f"question_{i+1}"
+        extracted_info[question_key] = {
+            "question": question,
+            "answer": "Not answered or unclear"
+        }
+        
+        # Try to find answers based on question keywords
+        if "name" in question.lower():
+            # Look for name patterns
+            name_patterns = [
+                r"my name is ([a-zA-Z\s]+)",
+                r"i'm ([a-zA-Z\s]+)",
+                r"this is ([a-zA-Z\s]+)",
+                r"call me ([a-zA-Z\s]+)"
+            ]
+            for pattern in name_patterns:
+                match = re.search(pattern, transcript_lower)
+                if match:
+                    extracted_info[question_key]["answer"] = match.group(1).strip().title()
+                    break
+        
+        elif "email" in question.lower():
+            # Look for email patterns
+            email_pattern = r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})"
+            match = re.search(email_pattern, transcript_lower)
+            if match:
+                extracted_info[question_key]["answer"] = match.group(1)
+        
+        elif "satisfied" in question.lower() or "rating" in question.lower() or "scale" in question.lower():
+            # Look for satisfaction ratings
+            rating_patterns = [
+                r"(\d+)\s*out of\s*(\d+)",
+                r"(\d+)\s*/\s*(\d+)",
+                r"rate.*?(\d+)",
+                r"(\d+)\s*stars?",
+                r"scale.*?(\d+)",
+                r"(\d+)\s*to\s*(\d+)"
+            ]
+            for pattern in rating_patterns:
+                match = re.search(pattern, transcript_lower)
+                if match:
+                    if len(match.groups()) > 1:
+                        extracted_info[question_key]["answer"] = f"{match.group(1)}/{match.group(2)}"
+                    else:
+                        extracted_info[question_key]["answer"] = f"{match.group(1)}/10"
+                    break
+        
+        elif "medication" in question.lower() or "medicine" in question.lower() or "lisinopril" in question.lower() or "losartan" in question.lower():
+            # Look for medication mentions
+            medication_patterns = [
+                r"taking ([a-zA-Z\s]+)",
+                r"prescribed ([a-zA-Z\s]+)",
+                r"medication.*?([a-zA-Z\s]+)",
+                r"medicine.*?([a-zA-Z\s]+)",
+                r"lisinopril",
+                r"losartan",
+                r"yes.*taking",
+                r"no.*taking"
+            ]
+            for pattern in medication_patterns:
+                match = re.search(pattern, transcript_lower)
+                if match:
+                    if match.groups():
+                        extracted_info[question_key]["answer"] = match.group(1).strip().title()
+                    else:
+                        extracted_info[question_key]["answer"] = match.group(0).strip().title()
+                    break
+    
+    return extracted_info
 
 @app.route('/')
 def home():
@@ -174,12 +290,11 @@ def create_agent():
         config = AgentConfig(
             name=data.get('name', 'AI Assistant'),
             prompt=data.get('prompt', 'You are a helpful AI assistant.'),
-            voice_id=data.get('voice_id', '21m00Tcm4TlvDq8ikWAM'),  # Default voice
+            voice_id=data.get('voice_id', '21m00Tcm4TlvDq8ikWAM'),
             language=data.get('language', 'en'),
             first_message=data.get('first_message')
         )
         
-        # Run async function in sync context
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         result = loop.run_until_complete(elevenlabs_client.create_agent(config))
@@ -203,13 +318,14 @@ def create_agent():
 
 @app.route('/api/make-call', methods=['POST'])
 def make_call():
-    """Initiate an AI phone call using ElevenLabs batch calling"""
+    """Initiate an AI phone call"""
     try:
         data = request.get_json()
         print(f"📞 Make call request for: {data.get('phoneNumber')}")
         
         phone_number = data.get('phoneNumber')
         agent_id = data.get('agentId')
+        questions = data.get('questions', [])
         
         if not phone_number:
             return jsonify({
@@ -220,12 +336,14 @@ def make_call():
         # Create agent if needed
         if not agent_id or agent_id == "create_new":
             print("🤖 Creating new agent for call...")
-            agent_config = AgentConfig(
-                name=data.get('agentName', 'AI Assistant'),
-                prompt=f"""You are {data.get('agentName', 'an AI assistant')} making a phone call for {data.get('callPurpose', 'information gathering')}.
+            
+            # Build custom prompt based on your current template structure
+            custom_prompt = data.get('customPrompt', '')
+            if not custom_prompt:
+                custom_prompt = f"""You are a professional AI assistant calling on behalf of Dr. Vinals. Be polite, professional, and empathetic.
 
 Your goal is to have a natural conversation and gather the following information:
-{chr(10).join(f"- {q}" for q in data.get('questions', [])) if data.get('questions') else "- General information as appropriate"}
+{chr(10).join(f"- {q}" for q in questions) if questions else "- General information as appropriate"}
 
 Guidelines:
 - Be polite and professional
@@ -235,13 +353,16 @@ Guidelines:
 - Thank the person for their time at the end
 - Keep the call concise but thorough
 
-Start the conversation with a friendly greeting and introduction.""",
+Start the conversation with a friendly greeting and introduction."""
+            
+            agent_config = AgentConfig(
+                name=data.get('agentName', 'AI Assistant'),
+                prompt=custom_prompt,
                 voice_id=data.get('voiceId', '21m00Tcm4TlvDq8ikWAM'),
                 language="en",
-                first_message=f"Hello! This is {data.get('agentName', 'an AI assistant')}. I'm calling regarding {data.get('callPurpose', 'a brief survey')}. Do you have a few minutes to chat?"
+                first_message=data.get('firstMessage') or f"Hello! This is {data.get('agentName', 'an AI assistant')}. I'm calling regarding {data.get('callPurpose', 'a brief survey')}. Do you have a few minutes to chat?"
             )
             
-            # Create agent
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             agent_result = loop.run_until_complete(elevenlabs_client.create_agent(agent_config))
@@ -249,7 +370,7 @@ Start the conversation with a friendly greeting and introduction.""",
             loop.close()
             print(f"✅ Agent created: {agent_id}")
         
-        # Now make the actual call using your phone number
+        # Make the call
         print(f"📞 Initiating call to {phone_number} with agent {agent_id}")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -267,8 +388,10 @@ Start the conversation with a friendly greeting and introduction.""",
             "status": "initiated",
             "start_time": datetime.now().isoformat(),
             "purpose": data.get('callPurpose'),
-            "questions": data.get('questions', []),
-            "batch_call_data": call_result
+            "questions": questions,
+            "batch_call_data": call_result,
+            "agent_name": data.get('agentName', 'AI Assistant'),
+            "conversation_processed": False  # Track if we've processed the conversation
         }
         
         print(f"✅ Call initiated successfully: {batch_call_id}")
@@ -310,7 +433,6 @@ This is just a test to verify agent creation works correctly.""",
             first_message=f"Hello! This is a test agent for {data.get('callPurpose', 'testing')}."
         )
         
-        # Create agent
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         agent_result = loop.run_until_complete(elevenlabs_client.create_agent(agent_config))
@@ -339,64 +461,231 @@ This is just a test to verify agent creation works correctly.""",
             'message': 'Failed to create test agent'
         }), 500
 
-@app.route('/api/batch-calls', methods=['GET'])
-def get_batch_calls():
-    """Get all batch calls"""
+@app.route('/api/call-status/<batch_call_id>', methods=['GET'])
+def get_call_status(batch_call_id):
+    """Get the status of a specific batch call with conversation results"""
     try:
-        print("📋 Getting batch calls...")
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(elevenlabs_client.get_batch_calls())
-        loop.close()
+        print(f"📋 Getting status for call: {batch_call_id}")
+        
+        if batch_call_id not in active_calls:
+            return jsonify({
+                "success": False,
+                "message": "Call not found"
+            }), 404
+        
+        local_info = active_calls[batch_call_id]
+        
+        # Get latest status from ElevenLabs
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # Get batch call details
+            batch_call_details = loop.run_until_complete(
+                elevenlabs_client.get_batch_call_details(batch_call_id)
+            )
+            
+            # Update local info with remote status
+            local_info.update(batch_call_details)
+            
+            # If call is completed and we haven't processed it yet, try to get conversation details
+            if (batch_call_details.get("status") == "completed" and 
+                not local_info.get("conversation_processed", False) and 
+                batch_call_id not in processed_calls):
+                
+                print(f"📞 Call completed, fetching conversation details...")
+                processed_calls.add(batch_call_id)  # Mark as being processed
+                
+                try:
+                    # Get conversations to find the one for this call
+                    conversations = loop.run_until_complete(elevenlabs_client.get_conversations())
+                    
+                    # Find conversation for this batch call
+                    conversation_found = False
+                    for conversation in conversations.get("conversations", []):
+                        if conversation.get("batch_call_id") == batch_call_id:
+                            conversation_id = conversation.get("conversation_id")
+                            print(f"📝 Found conversation: {conversation_id}")
+                            
+                            # Get conversation details
+                            conversation_details = loop.run_until_complete(
+                                elevenlabs_client.get_conversation_details(conversation_id)
+                            )
+                            
+                            # Extract information from transcript
+                            transcript = conversation_details.get("transcript", "")
+                            questions = local_info.get("questions", [])
+                            
+                            extracted_info = extract_information_from_transcript(transcript, questions)
+                            
+                            # Store results
+                            call_results[batch_call_id] = {
+                                "conversation_id": conversation_id,
+                                "transcript": transcript,
+                                "extracted_info": extracted_info,
+                                "conversation_details": conversation_details,
+                                "processed_at": datetime.now().isoformat()
+                            }
+                            
+                            local_info["conversation_results"] = call_results[batch_call_id]
+                            local_info["conversation_processed"] = True
+                            conversation_found = True
+                            print(f"✅ Conversation results processed and stored")
+                            break
+                    
+                    if not conversation_found:
+                        print(f"⚠️  No conversation found for batch call {batch_call_id}")
+                        # Don't mark as processed so we can try again later
+                        processed_calls.discard(batch_call_id)
+                        
+                except Exception as conv_error:
+                    print(f"⚠️  Error processing conversation: {conv_error}")
+                    # Don't mark as processed so we can try again later
+                    processed_calls.discard(batch_call_id)
+            
+            loop.close()
+            
+        except Exception as e:
+            print(f"⚠️  Could not get remote status: {e}")
         
         return jsonify({
             "success": True,
-            "batch_calls": result
+            "batch_call_id": batch_call_id,
+            "status": local_info.get("status", "unknown"),
+            "call_info": local_info,
+            "has_results": batch_call_id in call_results
         })
         
     except Exception as e:
-        print(f"❌ Error getting batch calls: {e}")
+        print(f"❌ Error getting call status: {e}")
         return jsonify({
             "success": False,
             "error": str(e)
         }), 500
 
-@app.route('/api/call-status/<batch_call_id>', methods=['GET'])
-def get_call_status(batch_call_id):
-    """Get the status of a specific batch call"""
+@app.route('/api/call-results/<batch_call_id>', methods=['GET'])
+def get_call_results(batch_call_id):
+    """Get conversation results for a completed call"""
     try:
-        if batch_call_id in active_calls:
-            local_info = active_calls[batch_call_id]
-            
-            # Get latest status from ElevenLabs
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                batch_calls = loop.run_until_complete(elevenlabs_client.get_batch_calls())
-                loop.close()
-                
-                # Find our specific batch call
-                for batch_call in batch_calls.get("batch_calls", []):
-                    if batch_call.get("id") == batch_call_id:
-                        local_info.update(batch_call)
-                        break
-                        
-            except Exception as e:
-                print(f"⚠️  Could not get remote status: {e}")
-            
+        if batch_call_id in call_results:
             return jsonify({
                 "success": True,
                 "batch_call_id": batch_call_id,
-                "status": local_info.get("status", "unknown"),
-                "call_info": local_info
+                "results": call_results[batch_call_id]
             })
         else:
             return jsonify({
                 "success": False,
-                "message": "Call not found"
+                "message": "No results found for this call"
             }), 404
             
     except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/active-calls', methods=['GET'])
+def get_active_calls():
+    """Get all active calls with their current status"""
+    try:
+        # Update status for all active calls (but don't process conversations here to avoid loops)
+        for batch_call_id in list(active_calls.keys()):
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                batch_call_details = loop.run_until_complete(
+                    elevenlabs_client.get_batch_call_details(batch_call_id)
+                )
+                # Only update status, don't process conversations here
+                active_calls[batch_call_id]["status"] = batch_call_details.get("status", "unknown")
+                loop.close()
+            except Exception as e:
+                print(f"⚠️  Could not update status for {batch_call_id}: {e}")
+        
+        return jsonify({
+            "success": True,
+            "active_calls": active_calls,
+            "call_results": call_results
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/process-conversation/<batch_call_id>', methods=['POST'])
+def process_conversation_manually(batch_call_id):
+    """Manually trigger conversation processing for a completed call"""
+    try:
+        if batch_call_id not in active_calls:
+            return jsonify({
+                "success": False,
+                "message": "Call not found"
+            }), 404
+        
+        if batch_call_id in call_results:
+            return jsonify({
+                "success": True,
+                "message": "Conversation already processed",
+                "results": call_results[batch_call_id]
+            })
+        
+        local_info = active_calls[batch_call_id]
+        
+        # Force conversation processing
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            conversations = loop.run_until_complete(elevenlabs_client.get_conversations())
+            
+            for conversation in conversations.get("conversations", []):
+                if conversation.get("batch_call_id") == batch_call_id:
+                    conversation_id = conversation.get("conversation_id")
+                    print(f"📝 Processing conversation: {conversation_id}")
+                    
+                    conversation_details = loop.run_until_complete(
+                        elevenlabs_client.get_conversation_details(conversation_id)
+                    )
+                    
+                    transcript = conversation_details.get("transcript", "")
+                    questions = local_info.get("questions", [])
+                    
+                    extracted_info = extract_information_from_transcript(transcript, questions)
+                    
+                    call_results[batch_call_id] = {
+                        "conversation_id": conversation_id,
+                        "transcript": transcript,
+                        "extracted_info": extracted_info,
+                        "conversation_details": conversation_details,
+                        "processed_at": datetime.now().isoformat()
+                    }
+                    
+                    local_info["conversation_results"] = call_results[batch_call_id]
+                    local_info["conversation_processed"] = True
+                    
+                    loop.close()
+                    
+                    return jsonify({
+                        "success": True,
+                        "message": "Conversation processed successfully",
+                        "results": call_results[batch_call_id]
+                    })
+            
+            loop.close()
+            return jsonify({
+                "success": False,
+                "message": "No conversation found for this call"
+            }), 404
+            
+        except Exception as e:
+            loop.close()
+            raise e
+            
+    except Exception as e:
+        print(f"❌ Error processing conversation: {e}")
         return jsonify({
             "success": False,
             "error": str(e)
@@ -410,9 +699,17 @@ def webhook_handler():
         print(f"🔔 Webhook received: {webhook_data.get('type', 'unknown')}")
         print(f"🔔 Webhook data: {json.dumps(webhook_data, indent=2)}")
         
-        # Store webhook data for debugging
+        # Store webhook data
         webhook_id = webhook_data.get("id", f"webhook_{datetime.now().isoformat()}")
-        active_calls[webhook_id] = webhook_data
+        conversation_data[webhook_id] = webhook_data
+        
+        # If this is a call completion webhook, mark for processing
+        if webhook_data.get("type") == "conversation_ended":
+            batch_call_id = webhook_data.get("batch_call_id")
+            if batch_call_id and batch_call_id in active_calls:
+                print(f"📞 Call {batch_call_id} ended via webhook")
+                active_calls[batch_call_id]["status"] = "completed"
+                # Don't process here to avoid webhook timeout, let the status endpoint handle it
         
         return jsonify({"status": "success"})
         
@@ -425,21 +722,12 @@ def get_webhooks():
     """Get all received webhooks for debugging"""
     return jsonify({
         "success": True,
-        "webhooks": active_calls
-    })
-
-@app.route('/api/active-calls', methods=['GET'])
-def get_active_calls():
-    """Get all active calls"""
-    return jsonify({
-        "success": True,
-        "active_calls": active_calls
+        "webhooks": conversation_data
     })
 
 # Custom 404 handler to suppress Socket.IO errors
 @app.errorhandler(404)
 def not_found(error):
-    # Don't log Socket.IO 404s
     if '/socket.io/' in request.path:
         return '', 404
     print(f"⚠️  404 Not Found: {request.path}")
@@ -449,6 +737,6 @@ if __name__ == '__main__':
     print("🚀 Starting CEX Protocol AI Backend on http://0.0.0.0:5001")
     print("🔑 ElevenLabs API Key configured:", "Yes" if ELEVENLABS_API_KEY != 'your-api-key-here' else "No - Please set ELEVENLABS_API_KEY")
     print(f"📞 Phone Number ID configured: {ELEVENLABS_PHONE_NUMBER_ID}")
-    print("\n✨ Server ready! You can now make actual phone calls!\n")
+    print("\n✨ Server ready with fixed call tracking (no infinite loops)!\n")
     
     app.run(host='0.0.0.0', port=5001, debug=True)

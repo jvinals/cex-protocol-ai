@@ -1,33 +1,38 @@
-// frontend/src/App.jsx - ENHANCED VERSION WITH AGENT CONFIGURATION
-// This version includes comprehensive agent configuration options
+// frontend/src/App.jsx - FIXED VERSION WITH BETTER CONVERSATION PROCESSING
+// This version handles conversation results better and provides manual processing option
 
 import { useState, useEffect } from 'react'
 import './App.css'
 
 function App() {
-  const [phoneNumber, setPhoneNumber] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('+34699043286')
   const [agentConfig, setAgentConfig] = useState({
-    name: 'AI Survey Agent',
-    purpose: 'Customer Survey',
+    name: 'Standard Basic Protocol',
+    purpose: 'General follow-up',
     questions: [
-      'What is your name?',
-      'What is your email address?',
-      'How satisfied are you with our service?'
+      'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, how are you feeling today?',
+      'Are you keeping up with Lisinopril as instructed?',
+      'What about Losartan?',
+      'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
+      'Have you noticed any new or different symptoms since we last spoke?',
+      'Is there anything else you\'d like Dr. Vinals to know about how you\'ve been feeling?'
     ],
     voiceId: '21m00Tcm4TlvDq8ikWAM', // Default voice
     language: 'en',
-    firstMessage: '',
+    firstMessage: 'Hi, I\'m the AI assistant of Dr. Vinals. I\'m calling to follow up on you and to ask if there are any concerns.',
     customPrompt: 'You are a professional AI assistant calling on behalf of Dr. Vinals. Be polite, professional, and helpful. Ask the questions clearly and listen carefully to the responses.'
   })
   const [callStatus, setCallStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [lastCallId, setLastCallId] = useState('')
-  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [currentCall, setCurrentCall] = useState(null)
   const [callResults, setCallResults] = useState(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [activeCalls, setActiveCalls] = useState({})
+  const [pollingInterval, setPollingInterval] = useState(null)
 
   // Available voices (you can expand this list)
   const availableVoices = [
-    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel' },
+    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel (Default)' },
     { id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi' },
     { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella' },
     { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni' },
@@ -37,56 +42,125 @@ function App() {
     { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam' }
   ]
 
-  // Agent templates
+  // Agent templates based on your current repository structure
   const agentTemplates = {
     'standard_protocol': {
       name: 'Standard Basic Protocol',
       purpose: 'General follow-up',
       questions: [
-        'Ive noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, where 1 means you feel much worse and 10 means you feel much better, how would you rate how you’ve been feeling with your blood pressure this past week?',
+        'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, where 1 means you are not satisfied with Lisinopril as instructed?',
         'Are you keeping up with Lisinopril as instructed?',
-        'Are you keeping up with Losartan as instructed?',
         'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
         'Have you noticed any new or different symptoms since we last spoke?',
-        'Is there anything else you\’d like Dr. Vinals to know about how you\’ve been feeling?',
+        'Is there anything else you\'d like Dr. Vinals to know about how you\'ve been feeling?'
       ],
-      firstMessage: 'Hi, I\’m the AI assistant of Dr. Vinals. I\’m calling to follow up on you and to ask if there\’s anything you\’d like the doctor to know.'
+      firstMessage: 'Hi, I\'m the AI assistant of Dr. Vinals. I\'m calling to follow up on you and to ask if there are any concerns.'
     },
     'hypertension_protocol': {
       name: 'Hypertension Protocol',
       purpose: 'Follow up on hypertension patients',
       questions: [
-        'Ive noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, where 1 means you feel much worse and 10 means you feel much better, how would you rate how you’ve been feeling with your blood pressure this past week?',
+        'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, how are you feeling today?',
         'Are you keeping up with Lisinopril as instructed?',
-        'Are you keeping up with Losartan as instructed?',
+        'What about Losartan?',
         'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
         'Have you noticed any new or different symptoms since we last spoke?',
-        'Is there anything else you\’d like Dr. Vinals to know about how you\’ve been feeling?',
+        'Is there anything else you\'d like Dr. Vinals to know about how you\'ve been feeling?'
       ],
-      firstMessage: 'Hi, I\’m the AI assistant of Dr. Vinals. I\’m calling to follow up on you and to ask if there\’s anything you\’d like the doctor to know.'
+      firstMessage: 'Hi, I\'m the AI assistant of Dr. Vinals. I\'m calling to follow up on you and to ask if there are any concerns.'
     },
     'diabetes_protocol': {
       name: 'Diabetes Protocol',
       purpose: 'Follow up on diabetes patients',
       questions: [
-        'What is your preferred date for the appointment?',
-        'What time works best for you?',
-        'What is your contact information?',
-        'Do you have any special requirements?'
+        'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, where 1 means you are not satisfied with Losartan as instructed?',
+        'Are you keeping up with Losartan as instructed?',
+        'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
+        'Have you noticed any new or different symptoms since we last spoke?',
+        'Is there anything else you\'d like Dr. Vinals to know about how you\'ve been feeling?'
       ],
-      firstMessage: 'Hi, I\’m the AI assistant of Dr. Vinals. I\’m calling to follow up on you and to ask if there\’s anything you\’d like the doctor to know.'
+      firstMessage: 'Hi, I\'m the AI assistant of Dr. Vinals. I\'m calling to follow up on you and to ask if there are any concerns.'
     },
-    'asthma_protocol': {
-      name: 'Asthma Protocol',
-      purpose: 'Follow up on asthmatic patients',
+    'customer_survey': {
+      name: 'Customer Survey Agent',
+      purpose: 'Customer satisfaction survey',
       questions: [
-        'What is your company name and role?',
-        'What is your current budget range?',
-        'When are you looking to make a decision?',
-        'What are your main pain points?'
+        'What is your name?',
+        'What is your email address?',
+        'How satisfied are you with our service on a scale of 1-10?',
+        'What could we improve?'
       ],
-      firstMessage: 'Hi, I\’m the AI assistant of Dr. Vinals. I\’m calling to follow up on you and to ask if there\’s anything you\’d like the doctor to know.'
-    }   
+      firstMessage: 'Hello! I\'m calling to conduct a brief customer satisfaction survey. Do you have 3-4 minutes to help us improve our service?'
+    }
+  }
+
+  // Poll for call status updates with better handling
+  useEffect(() => {
+    if (currentCall && !pollingInterval) {
+      const interval = setInterval(async () => {
+        try {
+          const response = await fetch(`http://localhost:5001/api/call-status/${currentCall.batch_call_id}`)
+          const data = await response.json()
+          
+          if (data.success) {
+            const status = data.call_info.status
+            setCallStatus(`📞 Call Status: ${formatCallStatus(status)}`)
+            
+            // Update current call info
+            setCurrentCall(prev => ({
+              ...prev,
+              status: status,
+              call_info: data.call_info
+            }))
+            
+            // If call is completed and has results, show them
+            if (status === 'completed') {
+              if (data.call_info.conversation_results) {
+                setCallResults(data.call_info.conversation_results)
+                setCallStatus('✅ Call completed! Results available below.')
+                clearInterval(interval)
+                setPollingInterval(null)
+              } else {
+                setCallStatus('✅ Call completed! Processing conversation... Click "Get Results" if they don\'t appear automatically.')
+              }
+            } else if (status === 'failed' || status === 'cancelled') {
+              setCallStatus(`❌ Call ${status}`)
+              clearInterval(interval)
+              setPollingInterval(null)
+            }
+          }
+        } catch (error) {
+          console.error('Error polling call status:', error)
+        }
+      }, 5000) // Poll every 5 seconds
+      
+      setPollingInterval(interval)
+    }
+    
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval)
+        setPollingInterval(null)
+      }
+    }
+  }, [currentCall, pollingInterval])
+
+  // Load active calls on component mount
+  useEffect(() => {
+    loadActiveCalls()
+  }, [])
+
+  const loadActiveCalls = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/active-calls')
+      const data = await response.json()
+      
+      if (data.success) {
+        setActiveCalls(data.active_calls)
+      }
+    } catch (error) {
+      console.error('Error loading active calls:', error)
+    }
   }
 
   const testBackend = async () => {
@@ -107,22 +181,6 @@ function App() {
     }
     
     setIsLoading(false)
-  }
-
-  const fetchCallResults = async (callId) => {
-    try {
-      const response = await fetch(`http://localhost:5001/api/call-results/${callId}`)
-      const data = await response.json()
-      
-      if (response.ok) {
-        setCallResults(data)
-        console.log('Call results:', data)
-      } else {
-        console.error('Failed to fetch call results:', data.error)
-      }
-    } catch (error) {
-      console.error('Error fetching call results:', error)
-    }
   }
 
   const testAgentCreation = async () => {
@@ -166,6 +224,13 @@ function App() {
 
     setIsLoading(true)
     setCallStatus('Initiating call...')
+    setCallResults(null) // Clear previous results
+    
+    // Clear any existing polling
+    if (pollingInterval) {
+      clearInterval(pollingInterval)
+      setPollingInterval(null)
+    }
     
     try {
       const response = await fetch('http://localhost:5001/api/make-call', {
@@ -189,13 +254,49 @@ function App() {
       console.log('Call response:', data)
       
       if (data.success) {
-        setCallStatus(`✅ Call initiated successfully! Call ID: ${data.call_id}`)
-        setLastCallId(data.call_id)
+        setCallStatus(`✅ Call initiated! Tracking progress...`)
+        setCurrentCall({
+          batch_call_id: data.batch_call_id,
+          agent_id: data.agent_id,
+          phone_number: phoneNumber,
+          status: 'initiated',
+          start_time: new Date().toISOString()
+        })
       } else {
         setCallStatus(`❌ Call failed: ${data.error}`)
       }
     } catch (error) {
       setCallStatus('❌ Error making call')
+    }
+    
+    setIsLoading(false)
+  }
+
+  const getCallResults = async () => {
+    if (!currentCall) {
+      setCallStatus('❌ No active call to get results for')
+      return
+    }
+
+    setIsLoading(true)
+    setCallStatus('Fetching conversation results...')
+    
+    try {
+      // Try to manually process the conversation
+      const response = await fetch(`http://localhost:5001/api/process-conversation/${currentCall.batch_call_id}`, {
+        method: 'POST'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        setCallResults(data.results)
+        setCallStatus('✅ Conversation results retrieved!')
+      } else {
+        setCallStatus(`❌ Could not get results: ${data.message}`)
+      }
+    } catch (error) {
+      setCallStatus('❌ Error fetching results')
     }
     
     setIsLoading(false)
@@ -237,21 +338,40 @@ function App() {
     })
   }
 
+  const formatCallStatus = (status) => {
+    const statusMap = {
+      'pending': '⏳ Pending',
+      'in_progress': '📞 In Progress',
+      'completed': '✅ Completed',
+      'failed': '❌ Failed',
+      'cancelled': '🚫 Cancelled'
+    }
+    return statusMap[status] || status
+  }
+
+  const stopPolling = () => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval)
+      setPollingInterval(null)
+      setCallStatus('⏸️ Stopped tracking call status')
+    }
+  }
+
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Careexpand Protocol AI</h1>
-        <p>Configure Protocl CEX AI agent</p>
+        <h1>CEX Protocol AI</h1>
+        <p>Testbed and Configuration of the Protocol AI agent</p>
       </header>
 
       <main className="main-content">
         {/* Agent Configuration Section */}
         <section className="config-section">
-          <h2>🎯 Agent Configuration</h2>
+          <h2>Agent Configuration</h2>
           
           {/* Quick Templates */}
           <div className="templates">
-            <h3>Quick Templates:</h3>
+            <h3>Protocol Templates:</h3>
             <div className="template-buttons">
               {Object.entries(agentTemplates).map(([key, template]) => (
                 <button 
@@ -317,11 +437,11 @@ function App() {
             <h3>Questions to Ask:</h3>
             {agentConfig.questions.map((question, index) => (
               <div key={index} className="question-item">
-                <input
-                  type="text"
+                <textarea
                   value={question}
                   onChange={(e) => updateQuestion(index, e.target.value)}
                   placeholder={`Question ${index + 1}`}
+                  rows="2"
                 />
                 <button 
                   onClick={() => removeQuestion(index)}
@@ -377,7 +497,7 @@ function App() {
 
         {/* Phone Call Section */}
         <section className="call-section">
-          <h2>📞 Make Phone Call</h2>
+          <h2>Make Phone Call</h2>
           
           <div className="phone-input">
             <label>
@@ -422,11 +542,99 @@ function App() {
               {callStatus}
             </div>
           )}
+
+          {/* Current Call Tracking */}
+          {currentCall && (
+            <div className="current-call">
+              <h3>Current Call</h3>
+              <div className="call-info">
+                <p><strong>Phone:</strong> {currentCall.phone_number}</p>
+                <p><strong>Status:</strong> {formatCallStatus(currentCall.status)}</p>
+                <p><strong>Call ID:</strong> {currentCall.batch_call_id}</p>
+                <p><strong>Started:</strong> {new Date(currentCall.start_time).toLocaleString()}</p>
+              </div>
+              
+              <div className="call-actions">
+                {currentCall.status === 'completed' && !callResults && (
+                  <button 
+                    onClick={getCallResults}
+                    disabled={isLoading}
+                    className="results-btn"
+                  >
+                    {isLoading ? '⏳ Getting Results...' : '📋 Get Results'}
+                  </button>
+                )}
+                
+                {pollingInterval && (
+                  <button 
+                    onClick={stopPolling}
+                    className="stop-btn"
+                  >
+                    ⏸️ Stop Tracking
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </section>
+
+        {/* Call Results Section */}
+        {callResults && (
+          <section className="results-section">
+            <h2>Conversation Results</h2>
+            
+            <div className="results-content">
+              <div className="extracted-info">
+                <h3>Extracted Information</h3>
+                {Object.entries(callResults.extracted_info).map(([key, info]) => (
+                  <div key={key} className="info-item">
+                    <strong>Q: {info.question}</strong>
+                    <p>A: {info.answer}</p>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="transcript">
+                <h3>Full Transcript</h3>
+                <div className="transcript-content">
+                  {callResults.transcript || 'No transcript available'}
+                </div>
+              </div>
+              
+              <div className="metadata">
+                <h3>ℹCall Metadata</h3>
+                <p><strong>Conversation ID:</strong> {callResults.conversation_id}</p>
+                <p><strong>Processed At:</strong> {new Date(callResults.processed_at).toLocaleString()}</p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Active Calls Section */}
+        {Object.keys(activeCalls).length > 0 && (
+          <section className="active-calls-section">
+            <h2>📞 Recent Calls</h2>
+            <div className="calls-list">
+              {Object.entries(activeCalls).map(([callId, callInfo]) => (
+                <div key={callId} className="call-item">
+                  <div className="call-header">
+                    <strong>{callInfo.phone_number || 'Unknown'}</strong>
+                    <span className="call-status">{formatCallStatus(callInfo.status)}</span>
+                  </div>
+                  <div className="call-details">
+                    <p>Agent: {callInfo.agent_name || 'Unknown'}</p>
+                    <p>Purpose: {callInfo.purpose || 'Unknown'}</p>
+                    <p>Started: {callInfo.start_time ? new Date(callInfo.start_time).toLocaleString() : 'Unknown'}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Configuration Preview */}
         <section className="preview-section">
-          <h2>👀 Agent Preview</h2>
+          <h2>Agent Preview</h2>
           <div className="preview-content">
             <p><strong>Name:</strong> {agentConfig.name}</p>
             <p><strong>Purpose:</strong> {agentConfig.purpose}</p>
@@ -442,47 +650,6 @@ function App() {
             )}
           </div>
         </section>
-
-        {/* Call Results Section */}
-        {lastCallId && (
-          <section className="results-section">
-            <h2>📊 Call Results</h2>
-            <div className="results-content">
-              <p><strong>Call ID:</strong> {lastCallId}</p>
-              <button 
-                onClick={() => fetchCallResults(lastCallId)}
-                className="fetch-results-btn"
-              >
-                🔄 Fetch Results
-              </button>
-              
-              {callResults && (
-                <div className="results-data">
-                  <h3>Call Summary</h3>
-                  <p><strong>Status:</strong> {callResults.status}</p>
-                  <p><strong>Duration:</strong> {Math.round(callResults.duration)} seconds</p>
-                  <p><strong>Total Responses:</strong> {callResults.total_responses}</p>
-                  <p><strong>Average Confidence:</strong> {(callResults.summary.average_confidence * 100).toFixed(1)}%</p>
-                  
-                  <h3>Responses</h3>
-                  <div className="responses-list">
-                    {callResults.responses.map((response, index) => (
-                      <div key={index} className="response-item">
-                        <p><strong>Response {index + 1}:</strong> {response.answer}</p>
-                        <p><em>Confidence: {(response.confidence * 100).toFixed(1)}%</em></p>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <h3>Raw JSON</h3>
-                  <pre className="json-display">
-                    {JSON.stringify(callResults, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
       </main>
     </div>
   )
