@@ -85,16 +85,17 @@ function App() {
       ],
       firstMessage: 'Hi, I\'m the AI assistant of Dr. Vinals. I\'m calling to follow up on you and to ask if there are any concerns.'
     },
-    'customer_survey': {
-      name: 'Customer Survey Agent',
-      purpose: 'Customer satisfaction survey',
+    'asthma_protocol': {
+      name: 'Asthma Protocol',
+      purpose: 'Follow up on asthmatic patients',
       questions: [
-        'What is your name?',
-        'What is your email address?',
-        'How satisfied are you with our service on a scale of 1-10?',
-        'What could we improve?'
+        'I\'ve noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, how are you feeling with Losartan as instructed?',
+        'Are you keeping up with Losartan as instructed?',
+        'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
+        'Have you noticed any new or different symptoms since we last spoke?',
+        'Is there anything else you\'d like Dr. Vinals to know about how you\'ve been feeling?'
       ],
-      firstMessage: 'Hello! I\'m calling to conduct a brief customer satisfaction survey. Do you have 3-4 minutes to help us improve our service?'
+      firstMessage: 'Hi, I\'m the AI assistant of Dr. Vinals. I\'m calling to follow up on you and to ask if there are any concerns.'
     }
   }
 
