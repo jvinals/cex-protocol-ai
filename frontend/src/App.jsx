@@ -45,7 +45,7 @@ function App() {
       questions: [
         'Ive noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, where 1 means you feel much worse and 10 means you feel much better, how would you rate how you’ve been feeling with your blood pressure this past week?',
         'Are you keeping up with Lisinopril as instructed?',
-        'Are you keeping up with Amlodipine as instructed?',
+        'Are you keeping up with Losartan as instructed?',
         'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
         'Have you noticed any new or different symptoms since we last spoke?',
         'Is there anything else you\’d like Dr. Vinals to know about how you\’ve been feeling?',
@@ -58,7 +58,7 @@ function App() {
       questions: [
         'Ive noticed that you have been improving lately, thats awesome!. On a scale from 1 to 10, where 1 means you feel much worse and 10 means you feel much better, how would you rate how you’ve been feeling with your blood pressure this past week?',
         'Are you keeping up with Lisinopril as instructed?',
-        'Are you keeping up with Amlodipine as instructed?',
+        'Are you keeping up with Losartan as instructed?',
         'In the past week, how often have you had symptoms like headaches, dizziness, or swelling?',
         'Have you noticed any new or different symptoms since we last spoke?',
         'Is there anything else you\’d like Dr. Vinals to know about how you\’ve been feeling?',
