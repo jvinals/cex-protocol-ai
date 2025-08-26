@@ -3,7 +3,7 @@ flask-cors==4.0.0
 flask-socketio==5.3.6
 python-socketio==5.10.0
 eventlet==0.33.3
-httpx
-pydantic
+httpx==0.25.2
+pydantic==2.5.0
+python-dotenv==1.0.0
 requests
-python-dotenv

@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import httpx
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_socketio import SocketIO
 from pydantic import BaseModel
 
 # Disable Flask's default request logging
@@ -28,6 +29,9 @@ app.config['SECRET_KEY'] = 'asdf6G5gvasqr$S$MG'
 
 # Enable CORS for all routes
 CORS(app, origins="*")
+
+# Initialize Socket.IO
+sio = SocketIO(app, cors_allowed_origins="*")
 
 # ElevenLabs configuration
 ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY', 'your-api-key-here')
@@ -981,10 +985,20 @@ def get_active_calls():
         "call_results": call_results
     })
 
-if __name__ == '__main__':
+# For Vercel deployment - DO NOT CHANGE THIS SECTION
+app.debug = False
+
+# Vercel entry point - this allows Vercel to import the app
+if __name__ != "__main__":
+    # This is for Vercel serverless deployment
+    # Vercel will import this file and use the 'app' object
+    pass
+else:
+    # Local development only - runs when you execute: python api/index.py
     print("🚀 Starting CEX Protocol AI Backend on http://0.0.0.0:5001")
-    api_key_configured = bool(ELEVENLABS_API_KEY and ELEVENLABS_API_KEY != 'your-api-key-here')
-    print(f"🔑 ElevenLabs API Key configured: {'Yes' if api_key_configured else 'No - Please set ELEVENLABS_API_KEY'}")
+    print(f"🔑 ElevenLabs API Key configured: {'Yes' if ELEVENLABS_API_KEY else 'No'}")
+    if not ELEVENLABS_API_KEY:
+        print("⚠️  Please set ELEVENLABS_API_KEY environment variable")
     print("✨ Server ready! Logs will show important events only.")
     
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host="0.0.0.0", port=5001, debug=True)

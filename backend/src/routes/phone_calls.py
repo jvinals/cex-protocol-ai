@@ -16,7 +16,7 @@ def test():
 @phone_calls_bp.route('/test-socket', methods=['GET'])
 def test_socket():
     """Test Socket.IO connection"""
-    from src.main import sio
+    from backend.api.index import sio
     print("Testing Socket.IO connection")
     sio.emit('test_event', {'message': 'Socket.IO test successful'})
     return jsonify({'message': 'Socket.IO test event sent'})
@@ -92,7 +92,7 @@ def make_call():
             print(f"Twilio call initiated with SID: {call_id}")
             
             # Emit Socket.IO event to update frontend
-            from src.main import sio
+            from backend.api.index import sio
             print(f"Emitting Socket.IO event: call_update with data: {{'call_id': '{call_id}', 'status': 'initiated'}}")
             
             try:
